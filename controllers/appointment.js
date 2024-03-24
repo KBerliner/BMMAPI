@@ -1,6 +1,20 @@
 const Appointment = require("../models/appointment.js");
 const db = require("../config/database.js");
 
+// Retrieve one appointment
+
+exports.getAppointment = (req, res) => {
+	db.query("SELECT * FROM appointments WHERE appointment_id = $1", [
+		req.params.id,
+	])
+		.then((appointment) => {
+			res.status(200).json(appointment.rows);
+		})
+		.catch((err) => {
+			res.status(500).json(err);
+		});
+};
+
 // Retrieve all appointments
 
 exports.allAppointments = (req, res) => {

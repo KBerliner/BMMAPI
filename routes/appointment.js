@@ -6,6 +6,7 @@ const apptCtrl = require("../controllers/appointment.js");
 // Routing Endpoints
 
 router.get("/", apptCtrl.allAppointments);
+router.get("/:id", apptCtrl.getAppointment);
 router.post("/", apptCtrl.addAppointment);
 
 module.exports = router;
