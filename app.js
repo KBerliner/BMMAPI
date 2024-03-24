@@ -4,6 +4,7 @@ const express = require("express");
 const app = express();
 const client = require("./config/database");
 
+const adminRoutes = require("./routes/admin.js");
 const apptRoutes = require("./routes/appointment.js");
 
 // Connecting to the database
@@ -38,6 +39,7 @@ app.use(express.json());
 
 // API Request Routing
 
+app.use("/api/admin/", adminRoutes);
 app.use("/api/appointments", apptRoutes);
 
 // Assigning a port
