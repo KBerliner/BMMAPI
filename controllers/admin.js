@@ -2,6 +2,9 @@
 const Admin = require("../models/admin.js");
 const db = require("../config/database.js");
 
+const moment = require("moment");
+const bcrypt = require("bcrypt");
+
 const AWS = require("../config/aws.js");
 
 // Initialize S3 instance
@@ -51,9 +54,9 @@ exports.addAdmin = (req, res) => {
 		admin_email: req.body.admin_email,
 		admin_phone_number: req.body.admin_phone_number,
 		admin_password: req.body.admin_password,
-		admin_created_at: req.body.admin_created_at,
-		admin_updated_last: req.body.admin_updated_last,
-		admin_last_login: req.body.admin_last_login,
+		admin_created_at: moment().format("YYYY-MM-DD HH:mm:ss"),
+		admin_updated_last: moment().format("YYYY-MM-DD HH:mm:ss"),
+		admin_last_login: moment().format("YYYY-MM-DD HH:mm:ss"),
 		admin_status: req.body.admin_status,
 	});
 
@@ -124,4 +127,48 @@ exports.addAdmin = (req, res) => {
 
 // Login as Admin
 
-exports.login = (req, res) => {};
+exports.login = async (req, res) => {
+	// Setting Variables
+	const sql = "SELECT * FROM admins WHERE admin_username = $1";
+
+	const values = [req.body.admin_username];
+
+	// Querying the database
+
+	db.query(sql, values)
+		.then((admin) => {
+			if (admin.rowCount > 0) {
+				bcrypt
+					.compare(req.body.admin_password, admin.rows[0].admin_password)
+					.then((result) => {
+						if (result) {
+							const updateLastLogin =
+								"UPDATE admins SET admin_last_login = $1 WHERE admin_id = $2";
+							const values = [
+								moment().format("YYYY-MM-DD HH:mm:ss"),
+								admin.rows[0].admin_id,
+							];
+							console.log("Values: ", values);
+							db.query(updateLastLogin, values).catch((err) => {
+								console.log(err);
+							});
+							res.status(200).json({
+								message: "Admin logged in successfully",
+								admin: admin.rows[0],
+							});
+						} else {
+							res.status(401).json({
+								message: "Incorrect password",
+							});
+						}
+					});
+			} else {
+				res.status(401).json({
+					message: "Incorrect username",
+				});
+			}
+		})
+		.catch((err) => {
+			res.status(500).json(err);
+		});
+};
