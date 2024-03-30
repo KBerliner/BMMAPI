@@ -4,6 +4,7 @@ const db = require("../config/database.js");
 
 const moment = require("moment");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
 const AWS = require("../config/aws.js");
 
@@ -16,9 +17,11 @@ const s3 = new AWS.S3();
 exports.getAdmin = (req, res) => {
 	db.query("SELECT * FROM admins WHERE admin_id = $1", [req.params.id])
 		.then((admin) => {
+			console.log(admin);
 			res.status(200).json(admin.rows);
 		})
 		.catch((err) => {
+			console.log(err);
 			res.status(500).json(err);
 		});
 };
@@ -98,10 +101,8 @@ exports.addAdmin = (req, res) => {
 				// Handling the rest of the request
 				values.push(data.Location);
 
-				console.log("Values: ", values);
-
 				db.query(sql, values)
-					.then((admin) => {
+					.then(() => {
 						res.status(201).json({
 							message: "Admin added successfully",
 						});
@@ -142,17 +143,35 @@ exports.login = async (req, res) => {
 					.compare(req.body.admin_password, admin.rows[0].admin_password)
 					.then((result) => {
 						if (result) {
+							// Checking if the admin is active
+							if (admin.rows[0].admin_status === false) {
+								return res.status(401).json({
+									message: "Your account is not active",
+								});
+							}
+
+							// Updating the last login time
+
 							const updateLastLogin =
 								"UPDATE admins SET admin_last_login = $1 WHERE admin_id = $2";
 							const values = [
 								moment().format("YYYY-MM-DD HH:mm:ss"),
 								admin.rows[0].admin_id,
 							];
-							console.log("Values: ", values);
 							db.query(updateLastLogin, values).catch((err) => {
 								console.log(err);
 							});
-							res.status(200).json({
+
+							// Sign a JWT Token
+							const token = jwt.sign(admin.rows[0], process.env.JWT_SECRET, {
+								expiresIn: "15m",
+							});
+
+							res.cookie("token", token, {
+								httpOnly: true,
+								secure: true,
+							});
+							return res.status(200).json({
 								message: "Admin logged in successfully",
 								admin: admin.rows[0],
 							});
@@ -167,6 +186,40 @@ exports.login = async (req, res) => {
 					message: "Incorrect username",
 				});
 			}
+		})
+		.catch((err) => {
+			res.status(500).json(err);
+		});
+};
+
+// Deactivate Admin
+
+exports.deactivateAdmin = (req, res) => {
+	const sql = "UPDATE admins SET admin_status = $1 WHERE admin_id = $2";
+	const values = [false, req.params.id];
+
+	db.query(sql, values)
+		.then(() => {
+			res.status(200).json({
+				message: "Admin deactivated successfully",
+			});
+		})
+		.catch((err) => {
+			res.status(500).json(err);
+		});
+};
+
+// Activate Admin
+
+exports.activateAdmin = (req, res) => {
+	const sql = "UPDATE admins SET admin_status = $1 WHERE admin_id = $2";
+	const values = [true, req.params.id];
+
+	db.query(sql, values)
+		.then(() => {
+			res.status(200).json({
+				message: "Admin activated successfully",
+			});
 		})
 		.catch((err) => {
 			res.status(500).json(err);
