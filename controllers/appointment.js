@@ -30,46 +30,61 @@ exports.allAppointments = (req, res) => {
 // Add a new appointment
 
 exports.addAppointment = (req, res) => {
-	console.log(req.body);
-	const sql =
-		"INSERT INTO appointments (customer_name, customer_email, customer_phone, appointment_date, appointment_time, appointment_location, appointment_description, appointment_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)";
-	const {
-		customer_name,
-		customer_email,
-		customer_phone,
-		appointment_date,
-		appointment_time,
-		appointment_location,
-		appointment_description,
-	} = req.body;
+	// First check if the appointment already exists
+	db.query("SELECT * FROM appointments WHERE appointment_date = $1", [
+		req.body.appointment_date,
+	])
+		.then((appointment) => {
+			if (appointment.rowCount > 0) {
+				res.status(403).json({ error: "Appointment time slot is unavailable" });
+				return Promise.reject("Appointment exists");
+			}
 
-	const newAppointment = new Appointment({
-		customer_name,
-		customer_email,
-		customer_phone,
-		appointment_date,
-		appointment_time,
-		appointment_location,
-		appointment_description,
-	});
+			// If the appointment doesn't exist, create it
+			const sql =
+				"INSERT INTO appointments (customer_name, customer_email, customer_phone, appointment_date, appointment_time, appointment_location, appointment_description, appointment_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)";
+			const {
+				customer_name,
+				customer_email,
+				customer_phone,
+				appointment_date,
+				appointment_time,
+				appointment_location,
+				appointment_description,
+			} = req.body;
 
-	const values = [
-		newAppointment.customer_name,
-		newAppointment.customer_email,
-		newAppointment.customer_phone,
-		newAppointment.appointment_date,
-		newAppointment.appointment_time,
-		newAppointment.appointment_location,
-		newAppointment.appointment_description,
-		newAppointment.id,
-	];
+			const newAppointment = new Appointment({
+				customer_name,
+				customer_email,
+				customer_phone,
+				appointment_date,
+				appointment_time,
+				appointment_location,
+				appointment_description,
+			});
 
-	console.log("SQL QUERY AND VALUES: ", sql, values);
-	db.query(sql, values)
+			const values = [
+				newAppointment.customer_name,
+				newAppointment.customer_email,
+				newAppointment.customer_phone,
+				newAppointment.appointment_date,
+				newAppointment.appointment_time,
+				newAppointment.appointment_location,
+				newAppointment.appointment_description,
+				newAppointment.id,
+			];
+			return db.query(sql, values);
+		})
 		.then(() => {
-			res.status(201).json(newAppointment);
+			res.status(201).json(req.body);
 		})
 		.catch((err) => {
-			res.status(500).json(err);
+			if (err !== "Appointment exists") {
+				if (err.code === "23502") {
+					res.status(500).json({ error: "Not all the fields were filled out" });
+				} else {
+					res.status(500).json(err);
+				}
+			}
 		});
 };
