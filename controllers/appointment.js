@@ -31,8 +31,8 @@ exports.allAppointments = (req, res) => {
 
 exports.addAppointment = (req, res) => {
 	// First check if the appointment already exists
-	db.query("SELECT * FROM appointments WHERE appointment_date = $1", [
-		req.body.appointment_date,
+	db.query("SELECT * FROM appointments WHERE appointment_time = $1", [
+		req.body.appointment_time,
 	])
 		.then((appointment) => {
 			if (appointment.rowCount > 0) {

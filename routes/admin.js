@@ -9,8 +9,10 @@ const { cookieJwtAuth } = require("../middleware/cookieJwtAuth.js");
 
 router.get("/", cookieJwtAuth, adminCtrl.allAdmins);
 router.get("/getAdmin/:id", cookieJwtAuth, adminCtrl.getAdmin);
-router.post("/", cookieJwtAuth, multer, adminCtrl.addAdmin);
+router.post("/", multer, adminCtrl.addAdmin);
 router.get("/login", adminCtrl.login);
+router.get("/checkSession", cookieJwtAuth, adminCtrl.checkSession);
+
 router.put("/deactivate/:id", cookieJwtAuth, adminCtrl.deactivateAdmin);
 router.put("/activate/:id", cookieJwtAuth, adminCtrl.activateAdmin);
 

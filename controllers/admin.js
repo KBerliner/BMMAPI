@@ -12,6 +12,12 @@ const AWS = require("../config/aws.js");
 
 const s3 = new AWS.S3();
 
+// Check Session
+
+exports.checkSession = (req, res) => {
+	res.status(200).json();
+};
+
 // Retrieve one admin
 
 exports.getAdmin = (req, res) => {
@@ -51,58 +57,75 @@ exports.addAdmin = (req, res) => {
 	const sql =
 		"INSERT INTO admins (admin_name, admin_id, admin_username, admin_email, admin_phone_number, admin_password, admin_created_at, admin_updated_last, admin_last_login, admin_status, admin_pfp_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
 
-	const newAdmin = new Admin({
-		admin_name: req.body.admin_name,
-		admin_username: req.body.admin_username,
-		admin_email: req.body.admin_email,
-		admin_phone_number: req.body.admin_phone_number,
-		admin_password: req.body.admin_password,
-		admin_created_at: moment().format("YYYY-MM-DD HH:mm:ss"),
-		admin_updated_last: moment().format("YYYY-MM-DD HH:mm:ss"),
-		admin_last_login: moment().format("YYYY-MM-DD HH:mm:ss"),
-		admin_status: req.body.admin_status,
-	});
+	// Hashing the password
 
-	console.log("new admin: ", newAdmin);
+	bcrypt
+		.hash(req.body.admin_password, 10)
+		.then((hash) => {
+			// Setting the Admin Model
+			const newAdmin = new Admin({
+				admin_name: req.body.admin_name,
+				admin_username: req.body.admin_username,
+				admin_email: req.body.admin_email,
+				admin_phone_number: req.body.admin_phone_number,
+				admin_password: hash,
+				admin_created_at: moment().format("YYYY-MM-DD HH:mm:ss"),
+				admin_updated_last: moment().format("YYYY-MM-DD HH:mm:ss"),
+				admin_last_login: moment().format("YYYY-MM-DD HH:mm:ss"),
+				admin_status: req.body.admin_status,
+			});
 
-	const values = [
-		newAdmin.admin_name,
-		newAdmin.id,
-		newAdmin.admin_username,
-		newAdmin.admin_email,
-		newAdmin.admin_phone_number,
-		newAdmin.admin_password,
-		newAdmin.admin_created_at,
-		newAdmin.admin_updated_last,
-		newAdmin.admin_last_login,
-		newAdmin.admin_status,
-	];
+			const values = [
+				newAdmin.admin_name,
+				newAdmin.id,
+				newAdmin.admin_username,
+				newAdmin.admin_email,
+				newAdmin.admin_phone_number,
+				newAdmin.admin_password,
+				newAdmin.admin_created_at,
+				newAdmin.admin_updated_last,
+				newAdmin.admin_last_login,
+				newAdmin.admin_status,
+			];
 
-	// Seeing if there is a profile picture in the request body
-	if (req.file) {
-		const uploadParams = {
-			Bucket: "bmmadminprofilepictures",
-			Key: req.file.originalname,
-			Body: req.file.buffer,
-			ContentType: `image/${MIME_TYPES[req.file.mimetype]}`,
-			ContentDisposition: "inline",
-		};
+			// Seeing if there is a profile picture in the request body
+			if (req.file) {
+				const uploadParams = {
+					Bucket: "bmmadminprofilepictures",
+					Key: req.file.originalname,
+					Body: req.file.buffer,
+					ContentType: `image/${MIME_TYPES[req.file.mimetype]}`,
+					ContentDisposition: "inline",
+				};
 
-		s3.upload(uploadParams, (err, data) => {
-			if (err) {
-				console.error("Error uploading file to S3", err);
-				res.status(500).json({
-					error: "Failed to upload profile picture to S3",
-					message: err,
+				s3.upload(uploadParams, (err, data) => {
+					if (err) {
+						console.error("Error uploading file to S3", err);
+						res.status(500).json({
+							error: "Failed to upload profile picture to S3",
+							message: err,
+						});
+					} else {
+						console.log("Successfully uploaded file to S3", data);
+
+						// Handling the rest of the request
+						values.push(data.Location);
+
+						db.query(sql, values)
+							.then(() => {
+								res.status(201).json({
+									message: "Admin added successfully",
+								});
+							})
+							.catch((err) => {
+								res.status(500).json(err);
+							});
+					}
 				});
 			} else {
-				console.log("Successfully uploaded file to S3", data);
-
-				// Handling the rest of the request
-				values.push(data.Location);
-
+				values.push(null);
 				db.query(sql, values)
-					.then(() => {
+					.then((admin) => {
 						res.status(201).json({
 							message: "Admin added successfully",
 						});
@@ -111,19 +134,10 @@ exports.addAdmin = (req, res) => {
 						res.status(500).json(err);
 					});
 			}
+		})
+		.catch((err) => {
+			res.status(500).json(err);
 		});
-	} else {
-		values.push(null);
-		db.query(sql, values)
-			.then((admin) => {
-				res.status(201).json({
-					message: "Admin added successfully",
-				});
-			})
-			.catch((err) => {
-				res.status(500).json(err);
-			});
-	}
 };
 
 // Login as Admin
